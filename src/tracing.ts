@@ -1,6 +1,6 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
@@ -10,6 +10,11 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+
+const serviceName = 'NestJs-service';
+const serviceVersion = '0.1.1';
 
 
 export function setupTracing() {
@@ -26,7 +31,7 @@ export function setupTracing() {
 
   const sdk = new NodeSDK({
     resource: new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: 'NestJs-service',
+      [SEMRESATTRS_SERVICE_NAME]: serviceName,
     }),
     traceExporter,
     metricReader: new PeriodicExportingMetricReader({
@@ -45,3 +50,23 @@ export function setupTracing() {
 
   sdk.start();
 }
+
+const logResource = Resource.default().merge(
+  new Resource({
+    [SEMRESATTRS_SERVICE_NAME]: serviceName,
+    [SEMRESATTRS_SERVICE_VERSION]: serviceVersion,
+  }),
+);
+
+const loggerProvider = new LoggerProvider({
+  resource: logResource,
+});
+
+const logExporter = new OTLPLogExporter({
+  url: 'http://127.0.0.1:4318/v1/logs',
+});
+
+
+loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(logExporter));
+
+export const logger = loggerProvider.getLogger('default', '1.0.0');
