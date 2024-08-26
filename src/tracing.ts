@@ -8,11 +8,13 @@ import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
 import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
 
 
 export function setupTracing() {
-  const consoleExporter: boolean = true;
-  let traceExporter;
+  const consoleExporter: boolean = false;
+  let traceExporter,metricReader;
 
   if (consoleExporter) {
     traceExporter = new ConsoleSpanExporter();
@@ -20,7 +22,6 @@ export function setupTracing() {
     traceExporter = new OTLPTraceExporter({
       url: 'http://localhost:4318/v1/traces',
     });
-
   }
 
   const sdk = new NodeSDK({
@@ -28,6 +29,13 @@ export function setupTracing() {
       [SemanticResourceAttributes.SERVICE_NAME]: 'NestJs-service',
     }),
     traceExporter,
+    metricReader: new PeriodicExportingMetricReader({
+      exporter: new OTLPMetricExporter({
+        url: 'http://localhost:4318/v1/metrics',
+        headers: {},
+      }),
+    }),
+  
     instrumentations: [
       new NestInstrumentation(),
       new HttpInstrumentation(),
